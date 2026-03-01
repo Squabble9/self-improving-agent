@@ -12,13 +12,14 @@ Log learnings and errors to markdown files for continuous improvement. Coding ag
 
 | Situation | Action |
 |-----------|--------|
-| Command/operation fails | Log to `.learnings/ERRORS.md` |
-| User corrects you | Log to `.learnings/LEARNINGS.md` with category `correction` |
-| User wants missing feature | Log to `.learnings/FEATURE_REQUESTS.md` |
-| API/external tool fails | Log to `.learnings/ERRORS.md` with integration details |
-| Knowledge was outdated | Log to `.learnings/LEARNINGS.md` with category `knowledge_gap` |
-| Found better approach | Log to `.learnings/LEARNINGS.md` with category `best_practice` |
-| Simplify/Harden recurring patterns | Log/update `.learnings/LEARNINGS.md` with `Source: simplify-and-harden` and a stable `Pattern-Key` |
+| Command/operation fails | Log to agent-specific `.learnings/ERRORS.md` |
+| User corrects you | Log to agent-specific `.learnings/LEARNINGS.md` with category `correction` |
+| User wants missing feature | Log to agent-specific `.learnings/FEATURE_REQUESTS.md` |
+| API/external tool fails | Log to agent-specific `.learnings/ERRORS.md` with integration details |
+| Knowledge was outdated | Log to agent-specific `.learnings/LEARNINGS.md` with category `knowledge_gap` |
+| Found better approach | Log to agent-specific `.learnings/LEARNINGS.md` with category `best_practice` |
+| Cross-agent issue discovered | Log to `~/.openclaw/workspace/.learnings/COMMON.md` |
+| Simplify/Harden recurring patterns | Log/update agent-specific `.learnings/LEARNINGS.md` with `Source: simplify-and-harden` and a stable `Pattern-Key` |
 | Similar to existing entry | Link with `**See Also**`, consider priority bump |
 | Broadly applicable learning | Promote to `CLAUDE.md`, `AGENTS.md`, and/or `.github/copilot-instructions.md` |
 | Workflow improvements | Promote to `AGENTS.md` (OpenClaw workspace) |
@@ -43,44 +44,102 @@ git clone https://github.com/peterskoett/self-improving-agent.git ~/.openclaw/sk
 
 Remade for openclaw from original repo : https://github.com/pskoett/pskoett-ai-skills - https://github.com/pskoett/pskoett-ai-skills/tree/main/skills/self-improvement
 
-### Workspace Structure
+### Per-Agent Learning Directories
 
-OpenClaw injects these files into every session:
+To prevent learning pollution between agents with different domains, each agent has their own `.learnings/` directory:
 
 ```
+~/.openclaw/agents/
+├── main/
+│   ├── AGENTS.md
+│   ├── SOUL.md
+│   ├── TOOLS.md
+│   └── .learnings/
+│       ├── LEARNINGS.md
+│       ├── ERRORS.md
+│       └── FEATURE_REQUESTS.md
+├── developer/
+│   ├── AGENTS.md
+│   ├── SOUL.md
+│   ├── TOOLS.md
+│   └── .learnings/
+│       ├── LEARNINGS.md
+│       ├── ERRORS.md
+│       └── FEATURE_REQUESTS.md
+├── scout/
+│   ├── AGENTS.md
+│   ├── SOUL.md
+│   ├── TOOLS.md
+│   └── .learnings/
+│       ├── LEARNINGS.md
+│       ├── ERRORS.md
+│       └── FEATURE_REQUESTS.md
+└── ... (other agents)
+```
+
+**Shared learnings** for cross-agent issues:
+```
 ~/.openclaw/workspace/
-├── AGENTS.md          # Multi-agent workflows, delegation patterns
-├── SOUL.md            # Behavioral guidelines, personality, principles
-├── TOOLS.md           # Tool capabilities, integration gotchas
-├── MEMORY.md          # Long-term memory (main session only)
-├── memory/            # Daily memory files
-│   └── YYYY-MM-DD.md
-└── .learnings/        # This skill's log files
-    ├── LEARNINGS.md
-    ├── ERRORS.md
-    └── FEATURE_REQUESTS.md
+└── .learnings/
+    └── COMMON.md
+```
+
+### Agent Detection
+
+The skill automatically detects the current agent using the `OPENCLAW_AGENT_ID` environment variable:
+
+```bash
+# In OpenClaw, this is set automatically
+export OPENCLAW_AGENT_ID="developer"  # or "main", "scout", etc.
+```
+
+If not set, it defaults to the `USER` environment variable or "default".
+
+### Directory Resolution
+
+**Agent-specific learnings (default):**
+```
+~/.openclaw/agents/{agent_id}/.learnings/
+```
+
+**Common/shared learnings:**
+```
+~/.openclaw/workspace/.learnings/COMMON.md
+```
+
+**Get the learnings directory in scripts:**
+```bash
+AGENT_ID="${OPENCLAW_AGENT_ID:-${USER:-default}}"
+LEARNINGS_DIR="${HOME}/.openclaw/agents/${AGENT_ID}/.learnings"
 ```
 
 ### Create Learning Files
 
+Create the agent-specific learning directory:
+
 ```bash
-mkdir -p ~/.openclaw/workspace/.learnings
+AGENT_ID="${OPENCLAW_AGENT_ID:-${USER:-default}}"
+mkdir -p "${HOME}/.openclaw/agents/${AGENT_ID}/.learnings"
 ```
 
-Then create the log files (or copy from `assets/`):
+Create the log files:
 - `LEARNINGS.md` — corrections, knowledge gaps, best practices
 - `ERRORS.md` — command failures, exceptions
 - `FEATURE_REQUESTS.md` — user-requested capabilities
+- `COMMON.md` — cross-agent issues (in workspace `.learnings/`)
+
+Templates available in `assets/`.
 
 ### Promotion Targets
 
-When learnings prove broadly applicable, promote them to workspace files:
+When learnings prove broadly applicable, promote them to appropriate files:
 
-| Learning Type | Promote To | Example |
-|---------------|------------|---------|
-| Behavioral patterns | `SOUL.md` | "Be concise, avoid disclaimers" |
-| Workflow improvements | `AGENTS.md` | "Spawn sub-agents for long tasks" |
-| Tool gotchas | `TOOLS.md` | "Git push needs auth configured first" |
+| Learning Type | Promote To | Location | Example |
+|---------------|------------|----------|---------|
+| Behavioral patterns | `SOUL.md` | Agent-specific | "Be concise, avoid disclaimers" |
+| Workflow improvements | `AGENTS.md` | Agent-specific | "Spawn sub-agents for long tasks" |
+| Tool gotchas | `TOOLS.md` | Agent-specific | "Git push needs auth configured first" |
+| Cross-agent issues | `COMMON.md` | Workspace | "All agents must check notifications first" |
 
 ### Inter-Session Communication
 
@@ -130,9 +189,9 @@ When errors or corrections occur:
 
 ## Logging Format
 
-### Learning Entry
+### Learning Entry (Agent-Specific)
 
-Append to `.learnings/LEARNINGS.md`:
+Append to `~/.openclaw/agents/{agent}/.learnings/LEARNINGS.md`:
 
 ```markdown
 ## [LRN-YYYYMMDD-XXX] category
@@ -160,13 +219,43 @@ Specific fix or improvement to make
 - Recurrence-Count: 1 (optional)
 - First-Seen: 2025-01-15 (optional)
 - Last-Seen: 2025-01-15 (optional)
+- Scope: agent-specific | common (default: agent-specific)
+
+---
+```
+
+### Common Learning Entry (Cross-Agent)
+
+Append to `~/.openclaw/workspace/.learnings/COMMON.md`:
+
+```markdown
+## [COM-YYYYMMDD-XXX] category
+
+**Logged**: ISO-8601 timestamp
+**Priority**: low | medium | high | critical
+**Status**: pending
+**Affected Agents**: main, developer, scout, ...
+
+### Summary
+One-line description of the cross-agent issue
+
+### Details
+Full context: what affects multiple agents, why it's common
+
+### Suggested Action
+Specific fix or improvement for all agents
+
+### Metadata
+- Source: conversation | error | user_feedback | cross_agent_analysis
+- Tags: tag1, tag2
+- See Also: LRN-... (links to agent-specific entries if related)
 
 ---
 ```
 
 ### Error Entry
 
-Append to `.learnings/ERRORS.md`:
+Append to `~/.openclaw/agents/{agent}/.learnings/ERRORS.md`:
 
 ```markdown
 ## [ERR-YYYYMMDD-XXX] skill_or_command_name
@@ -196,13 +285,14 @@ If identifiable, what might resolve this
 - Reproducible: yes | no | unknown
 - Related Files: path/to/file.ext
 - See Also: ERR-20250110-001 (if recurring)
+- Scope: agent-specific | common (default: agent-specific)
 
 ---
 ```
 
 ### Feature Request Entry
 
-Append to `.learnings/FEATURE_REQUESTS.md`:
+Append to `~/.openclaw/agents/{agent}/.learnings/FEATURE_REQUESTS.md`:
 
 ```markdown
 ## [FEAT-YYYYMMDD-XXX] capability_name
@@ -227,6 +317,7 @@ How this could be built, what it might extend
 ### Metadata
 - Frequency: first_time | recurring
 - Related Features: existing_feature_name
+- Scope: agent-specific | common (default: agent-specific)
 
 ---
 ```
@@ -234,11 +325,11 @@ How this could be built, what it might extend
 ## ID Generation
 
 Format: `TYPE-YYYYMMDD-XXX`
-- TYPE: `LRN` (learning), `ERR` (error), `FEAT` (feature)
+- TYPE: `LRN` (learning), `ERR` (error), `FEAT` (feature), `COM` (common)
 - YYYYMMDD: Current date
 - XXX: Sequential number or random 3 chars (e.g., `001`, `A7B`)
 
-Examples: `LRN-20250115-001`, `ERR-20250115-A3F`, `FEAT-20250115-002`
+Examples: `LRN-20250115-001`, `ERR-20250115-A3F`, `FEAT-20250115-002`, `COM-20250115-001`
 
 ## Resolving Entries
 
@@ -272,13 +363,14 @@ When a learning is broadly applicable (not a one-off fix), promote it to permane
 
 ### Promotion Targets
 
-| Target | What Belongs There |
-|--------|-------------------|
-| `CLAUDE.md` | Project facts, conventions, gotchas for all Claude interactions |
-| `AGENTS.md` | Agent-specific workflows, tool usage patterns, automation rules |
-| `.github/copilot-instructions.md` | Project context and conventions for GitHub Copilot |
-| `SOUL.md` | Behavioral guidelines, communication style, principles (OpenClaw workspace) |
-| `TOOLS.md` | Tool capabilities, usage patterns, integration gotchas (OpenClaw workspace) |
+| Target | What Belongs There | Location |
+|--------|-------------------|----------|
+| `CLAUDE.md` | Project facts, conventions, gotchas for all Claude interactions | Project root |
+| `AGENTS.md` | Agent-specific workflows, tool usage patterns, automation rules | Agent-specific |
+| `.github/copilot-instructions.md` | Project context and conventions for GitHub Copilot | .github/ |
+| `SOUL.md` | Behavioral guidelines, communication style, principles | Agent-specific |
+| `TOOLS.md` | Tool capabilities, usage patterns, integration gotchas | Agent-specific |
+| `COMMON.md` | Cross-agent issues, shared conventions | Workspace `.learnings/` |
 
 ### How to Promote
 
@@ -315,7 +407,7 @@ When a learning is broadly applicable (not a one-off fix), promote it to permane
 
 If logging something similar to an existing entry:
 
-1. **Search first**: `grep -r "keyword" .learnings/`
+1. **Search first**: `grep -r "keyword" ~/.openclaw/agents/{agent}/.learnings/`
 2. **Link entries**: Add `**See Also**: ERR-20250110-001` in Metadata
 3. **Bump priority** if issue keeps recurring
 4. **Consider systemic fix**: Recurring issues often indicate:
@@ -332,8 +424,8 @@ skill and turn them into durable prompt guidance.
 
 1. Read `simplify_and_harden.learning_loop.candidates` from the task summary.
 2. For each candidate, use `pattern_key` as the stable dedupe key.
-3. Search `.learnings/LEARNINGS.md` for an existing entry with that key:
-   - `grep -n "Pattern-Key: <pattern_key>" .learnings/LEARNINGS.md`
+3. Search agent-specific `.learnings/LEARNINGS.md` for an existing entry with that key:
+   - `grep -n "Pattern-Key: <pattern_key>" ~/.openclaw/agents/{agent}/.learnings/LEARNINGS.md`
 4. If found:
    - Increment `Recurrence-Count`
    - Update `Last-Seen`
@@ -352,17 +444,15 @@ Promote recurring patterns into agent context/system prompt files when all are t
 - Occurred within a 30-day window
 
 Promotion targets:
-- `CLAUDE.md`
-- `AGENTS.md`
-- `.github/copilot-instructions.md`
-- `SOUL.md` / `TOOLS.md` for OpenClaw workspace-level guidance when applicable
+- Agent-specific `CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`
+- Agent-specific `SOUL.md` / `TOOLS.md` for OpenClaw workspace-level guidance
 
 Write promoted rules as short prevention rules (what to do before/while coding),
 not long incident write-ups.
 
 ## Periodic Review
 
-Review `.learnings/` at natural breakpoints:
+Review agent-specific `.learnings/` at natural breakpoints:
 
 ### When to Review
 - Before starting a new major task
@@ -372,14 +462,20 @@ Review `.learnings/` at natural breakpoints:
 
 ### Quick Status Check
 ```bash
+AGENT_ID="${OPENCLAW_AGENT_ID:-${USER:-default}}"
+LEARNINGS_DIR="${HOME}/.openclaw/agents/${AGENT_ID}/.learnings"
+
 # Count pending items
-grep -h "Status\*\*: pending" .learnings/*.md | wc -l
+grep -h "Status\*\*: pending" "${LEARNINGS_DIR}"/*.md 2>/dev/null | wc -l
 
 # List pending high-priority items
-grep -B5 "Priority\*\*: high" .learnings/*.md | grep "^## \["
+grep -B5 "Priority\*\*: high" "${LEARNINGS_DIR}"/*.md 2>/dev/null | grep "^## \["
 
 # Find learnings for a specific area
-grep -l "Area\*\*: backend" .learnings/*.md
+grep -l "Area\*\*: backend" "${LEARNINGS_DIR}"/*.md 2>/dev/null
+
+# Check common learnings
+grep -h "Status\*\*: pending" "${HOME}/.openclaw/workspace/.learnings/COMMON.md" 2>/dev/null | wc -l
 ```
 
 ### Review Actions
@@ -447,6 +543,8 @@ Use to filter learnings by codebase region:
 6. **Use consistent categories** - enables filtering
 7. **Promote aggressively** - if in doubt, add to CLAUDE.md or .github/copilot-instructions.md
 8. **Review regularly** - stale learnings lose value
+9. **Flag cross-agent issues** - use `Scope: common` or log to COMMON.md
+10. **Respect agent boundaries** - don't let Scout's social learnings pollute Kevin's coding context
 
 ## Gitignore Options
 
@@ -541,6 +639,7 @@ A learning qualifies for skill extraction when ANY of these apply:
 1. **Identify candidate**: Learning meets extraction criteria
 2. **Run helper** (or create manually):
    ```bash
+   AGENT_ID="${OPENCLAW_AGENT_ID:-${USER:-default}}"
    ./skills/self-improvement/scripts/extract-skill.sh skill-name --dry-run
    ./skills/self-improvement/scripts/extract-skill.sh skill-name
    ```
@@ -645,3 +744,38 @@ Or use quick prompts:
 - "Log this to learnings"
 - "Create a skill from this solution"
 - "Check .learnings/ for related issues"
+
+## Per-Agent Learning: Quick Reference
+
+### When to use agent-specific vs common:
+
+| Use Case | Log Location |
+|----------|-------------|
+| Coding best practices | `~/.openclaw/agents/developer/.learnings/` |
+| Twitter engagement patterns | `~/.openclaw/agents/scout/.learnings/` |
+| Task management workflows | `~/.openclaw/agents/main/.learnings/` |
+| Cross-agent coordination issues | `~/.openclaw/workspace/.learnings/COMMON.md` |
+| Tool authentication problems | `~/.openclaw/workspace/.learnings/COMMON.md` |
+| Shared infrastructure issues | `~/.openclaw/workspace/.learnings/COMMON.md` |
+
+### Creating agent directories:
+
+```bash
+# Create learnings directory for current agent
+AGENT_ID="${OPENCLAW_AGENT_ID:-${USER:-default}}"
+mkdir -p "${HOME}/.openclaw/agents/${AGENT_ID}/.learnings"
+
+# Copy templates
+cp ~/.openclaw/skills/self-improving-agent/assets/LEARNINGS.md.template \
+   "${HOME}/.openclaw/agents/${AGENT_ID}/.learnings/LEARNINGS.md"
+
+cp ~/.openclaw/skills/self-improving-agent/assets/ERRORS.md.template \
+   "${HOME}/.openclaw/agents/${AGENT_ID}/.learnings/ERRORS.md"
+
+cp ~/.openclaw/skills/self-improving-agent/assets/FEATURE_REQUESTS.md.template \
+   "${HOME}/.openclaw/agents/${AGENT_ID}/.learnings/FEATURE_REQUESTS.md"
+
+# Create common learnings file
+mkdir -p "${HOME}/.openclaw/workspace/.learnings"
+touch "${HOME}/.openclaw/workspace/.learnings/COMMON.md"
+```
